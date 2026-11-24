@@ -2,10 +2,11 @@
 import requests
 import pandas as pd
 import time
+from google.cloud import bigquery
 
 # Establish variables
-CLIENT_ID = "omitted"
-CLIENT_SECRET = "omitted"
+CLIENT_ID = "omitted_for_security"
+CLIENT_SECRET = "omitted_for_security"
 url = "https://id.twitch.tv/oauth2/token"
 params = {
     "client_id": CLIENT_ID,
@@ -107,3 +108,26 @@ df["release_year"] = df["release_date"].dt.year
 
 # Converts the dataframe to a CSV file and saves it to the local directory
 df.to_csv("games.csv", index=False)
+
+# Initialize the client directly with your JSON key file
+client = bigquery.Client.from_service_account_json("gcp_key.json")
+
+# Initialize BigQuery client
+#client = bigquery.Client(project = "datawarehouse247")
+
+# Define your target dataset and table
+table_id = "datawarehouse247.igdb.game_popularity_by_genre"
+
+# Configure push job to BigQuery
+job_config = bigquery.LoadJobConfig(
+    source_format=bigquery.SourceFormat.CSV,
+    #skip_leading_rows=1,  # Skip the header row
+    autodetect=True,      # Automatically infer column names and types
+    write_disposition="WRITE_TRUNCATE",  # Overwrites table; use "WRITE_APPEND" to add rows
+)
+#Open the CSV and upload it
+with open("games.csv", "rb") as source_file:
+    job = client.load_table_from_file(source_file, table_id, job_config=job_config)
+
+job.result()  # Wait for the load job to complete
+print(f"Loaded {job.output_rows} rows into {table_id}.")
